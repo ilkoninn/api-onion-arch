@@ -1,3 +1,6 @@
+using Project.Persistance;
+using Project.Persistance.Contexts;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -6,6 +9,9 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Add dependency injection services
+builder.Services.AddPersistanceDependencyInjection(builder.Configuration);
 
 var app = builder.Build();
 
@@ -16,10 +22,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
 
+// Add admin user and roles to the database
+using var scope = app.Services.CreateScope();
+await AutomatedMigration.MigrateAsync(scope.ServiceProvider);
+
+app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
-
 app.Run();
