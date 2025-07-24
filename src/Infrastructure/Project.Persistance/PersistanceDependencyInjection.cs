@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Project.Application.Repositories.ProductRepositories;
 using Project.Core.Entities.Identities;
 using Project.Persistance.Contexts;
+using Project.Persistance.RepositoryConcretes.ProductRepositoryConcretes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -66,7 +68,8 @@ namespace Project.Persistance
 
         private static void AddRepositories(this IServiceCollection services)
         {
-            // Repositories here !!!
+            services.AddScoped<IProductReadRepository, ProductReadRepository>();
+            services.AddScoped<IProductWriteRepository, ProductWriteRepository>();
         }
 
         private static void AddServices(this IServiceCollection services)

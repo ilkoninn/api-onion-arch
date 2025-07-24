@@ -4,12 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Project.Core.Enums
+namespace Project.Application.Features.Commands.CreateProduct
 {
-    public enum EUserRoles
+    public class CreateProductCommandResponse
     {
-        SuperAdmin,
-        Admin,
-        Moderator,
     }
 }

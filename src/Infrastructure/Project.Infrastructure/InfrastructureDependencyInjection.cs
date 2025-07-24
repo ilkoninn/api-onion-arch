@@ -9,7 +9,7 @@ namespace Project.Infrastructure
 {
     public static class InfrastructureDependencyInjection
     {
-        public static IServiceCollection AddInfrastructureDependencyInjection(this IServiceCollection services, IConfiguration configuration)
+        public static IServiceCollection AddInfrastructureDependencyInjection(this IServiceCollection services)
         {
             // Infrastructure services here !!!
 

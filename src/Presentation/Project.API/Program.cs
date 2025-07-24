@@ -1,5 +1,8 @@
+using Project.Application;
+using Project.Infrastructure;
 using Project.Persistance;
 using Project.Persistance.Contexts;
+using Project.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +15,10 @@ builder.Services.AddSwaggerGen();
 
 // Add dependency injection services
 builder.Services.AddPersistanceDependencyInjection(builder.Configuration);
+builder.Services.AddSignalRDependencyInjection(builder.Configuration);
+builder.Services.AddInfrastructureDependencyInjection();
+builder.Services.AddApplicationDependencyInjection();
+
 
 var app = builder.Build();
 
