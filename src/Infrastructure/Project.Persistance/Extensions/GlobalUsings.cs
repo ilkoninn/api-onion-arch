@@ -1,0 +1,11 @@
+﻿global using Microsoft.EntityFrameworkCore;
+global using Microsoft.EntityFrameworkCore.Metadata.Builders;
+global using Microsoft.Extensions.Configuration;
+global using Microsoft.Extensions.DependencyInjection;
+global using Project.Core.Entities.Common;
+global using Project.Core.Entities.Identities;
+global using Project.Persistance.Context;
+global using Project.Persistance.Interceptors;
+global using System.Linq.Expressions;
+global using System.Reflection;
+global using Microsoft.EntityFrameworkCore.Diagnostics;

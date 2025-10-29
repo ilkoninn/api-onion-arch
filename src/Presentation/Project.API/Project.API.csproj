@@ -12,6 +12,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Domain\Project.Application\Project.Application.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\Project.Infrastructure\Project.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\Project.Persistance\Project.Persistance.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\Project.SignalR\Project.SignalR.csproj" />
   </ItemGroup>
 
 </Project>
