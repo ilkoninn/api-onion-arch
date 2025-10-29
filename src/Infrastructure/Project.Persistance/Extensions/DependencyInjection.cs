@@ -13,7 +13,7 @@ public static class DependencyInjection
         // Register DbContext with interceptors
         services.AddDbContext<AppDbContext>((serviceProvider, options) =>
         {
-            var connectionString = configuration.GetConnectionString("DefaultConnection");
+            var connectionString = configuration["DatabaseSettings:ConnectionString"];
             
             options.UseSqlServer(connectionString, sqlOptions =>
             {

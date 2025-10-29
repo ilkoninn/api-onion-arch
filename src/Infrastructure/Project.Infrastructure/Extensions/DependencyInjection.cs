@@ -1,5 +1,4 @@
 ﻿using System.Reflection;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Project.Infrastructure.Extensions;
 
@@ -7,6 +6,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
+        // Register HttpContextAccessor (required by ClaimService)
+        services.AddHttpContextAccessor();
+
+        // Register services
         RegisterServices(services, Assembly.GetExecutingAssembly());
 
         return services;
@@ -21,8 +24,11 @@ public static class DependencyInjection
                 Implementation = t,
                 Interfaces = t.GetInterfaces()
                     .Where(i => i.IsPublic && 
-                               assembly.GetTypes().Contains(i) && 
-                               i.Name.StartsWith("I"))
+                               !i.IsGenericType &&
+                               i.Name.StartsWith("I") &&
+                               // Allow interfaces from any assembly, not just current assembly
+                               i != typeof(IDisposable) &&
+                               i != typeof(IAsyncDisposable))
             })
             .Where(x => x.Interfaces.Any());
 
