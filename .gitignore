@@ -20,9 +20,7 @@ src/.vs/
 .vscode/
 
 # Development settings - local məlumatları göndərmə
-**/appsettings.Development.json
-**/appsettings.Local.json
-appsettings.*.local.json
+src/Presentation/Project.API/appsettings.Development.json
 
 ## Rider
 .idea/
