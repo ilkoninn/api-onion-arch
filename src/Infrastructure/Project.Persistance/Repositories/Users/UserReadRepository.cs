@@ -43,7 +43,7 @@ public sealed class UserReadRepository : ReadRepository<User>, IUserReadReposito
     {
         return await DbSet
             .AsNoTracking()
-            .Where(u => u.Status == UserStatus.Active && !u.IsLocked)
+            .Where(u => u.Status == EUserStatus.Active && !u.IsLocked)
             .ToListAsync(cancellationToken);
     }
 

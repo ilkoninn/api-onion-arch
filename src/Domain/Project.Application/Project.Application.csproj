@@ -6,6 +6,10 @@
 		<Nullable>enable</Nullable>
 	</PropertyGroup>
 
+	<ItemGroup>
+	  <PackageReference Include="Scrutor" Version="6.1.0" />
+	</ItemGroup>
+
 
 	<ItemGroup>
 		<ProjectReference Include="..\Project.Core\Project.Core.csproj" />

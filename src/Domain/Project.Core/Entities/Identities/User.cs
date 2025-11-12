@@ -24,7 +24,7 @@ public sealed class User : SoftDeletableEntity
     public bool TwoFactorEnabled { get; set; }
 
     // Account Status
-    public UserStatus Status { get; set; } = UserStatus.Active;
+    public EUserStatus Status { get; set; } = EUserStatus.Active;
     public bool IsLocked { get; set; }
     public DateTime? LockoutEnd { get; set; }
     public int AccessFailedCount { get; set; }
@@ -41,5 +41,5 @@ public sealed class User : SoftDeletableEntity
 
     // Computed (read-only)
     public string FullName => $"{FirstName} {LastName}".Trim();
-    public bool IsActive => Status == UserStatus.Active && !IsDeleted && !IsLocked;
+    public bool IsActive => Status == EUserStatus.Active && !IsDeleted && !IsLocked;
 }

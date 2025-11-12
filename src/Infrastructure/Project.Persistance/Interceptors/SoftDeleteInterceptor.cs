@@ -1,5 +1,3 @@
-using Project.Application.Abstractions.Services.Infrastructure;
-
 namespace Project.Persistance.Interceptors;
 
 /// <summary>

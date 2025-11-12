@@ -1,9 +1,3 @@
-using Project.Application.Abstractions.Repositories.Users;
-using Project.Application.Abstractions.Services.Domain;
-using Project.Application.Abstractions.Services.Infrastructure;
-using Project.Core.Entities.Identities;
-using Project.Core.Enums;
-
 namespace Project.Application.Services;
 
 /// <summary>
@@ -38,7 +32,7 @@ public sealed class UserService(
             LastName = lastName,
             PasswordHash = passwordHasher.HashPassword(password),
             SecurityStamp = Guid.NewGuid().ToString(),
-            Status = UserStatus.Active,
+            Status = EUserStatus.Active,
             EmailConfirmed = false
         };
 
