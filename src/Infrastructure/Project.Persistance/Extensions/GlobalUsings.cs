@@ -18,3 +18,6 @@ global using Project.Persistance.Interceptors;
 global using System;
 global using System.Linq.Expressions;
 global using System.Reflection;
+global using Project.Application.Abstractions.Repositories.RefreshTokens;
+global using Project.Application.Abstractions.Repositories.UserLoginHistories;
+global using U = Project.Persistance.UnitOfWork;

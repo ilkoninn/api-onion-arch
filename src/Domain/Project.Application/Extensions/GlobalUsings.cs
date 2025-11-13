@@ -1,10 +1,21 @@
-﻿global using Microsoft.Extensions.DependencyInjection;
+﻿global using AutoMapper;
+global using MediatR;
+global using Microsoft.EntityFrameworkCore.Storage;
+global using Microsoft.Extensions.Configuration;
+global using Microsoft.Extensions.DependencyInjection;
+global using NetCore.AutoRegisterDi;
+global using Project.Application.Abstractions.Persistence;
+global using Project.Application.Abstractions.Repositories.RefreshTokens;
+global using Project.Application.Abstractions.Repositories.UserLoginHistories;
 global using Project.Application.Abstractions.Repositories.Users;
 global using Project.Application.Abstractions.Services.Domain;
 global using Project.Application.Abstractions.Services.Infrastructure;
+global using Project.Application.DTOs.Auth;
+global using Project.Application.Features.Auth.Commands.Login;
+global using Project.Application.Features.Auth.Commands.RefreshToken;
+global using Project.Application.Features.Auth.Commands.Register;
+global using Project.Application.Features.Auth.Commands.RevokeToken;
 global using Project.Core.Entities.Identities;
 global using Project.Core.Enums;
 global using System.Linq.Expressions;
 global using System.Reflection;
-global using Microsoft.EntityFrameworkCore.Storage;
-

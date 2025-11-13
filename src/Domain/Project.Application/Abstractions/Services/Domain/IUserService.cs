@@ -6,27 +6,20 @@ namespace Project.Application.Abstractions.Services.Domain;
 public interface IUserService
 {
     // Authentication
-    Task<(User User, string Token, string RefreshToken)> RegisterAsync(
-        string email,
-        string password,
-        string? firstName = null,
-        string? lastName = null,
+    Task<RegisterUserResponseDto> RegisterAsync(
+        RegisterUserDto dto,
         CancellationToken cancellationToken = default);
 
-    Task<(User User, string Token, string RefreshToken)> LoginAsync(
-        string email,
-        string password,
-        string ipAddress,
+    Task<LoginResponseDto> LoginAsync(
+        LoginDto dto,
         CancellationToken cancellationToken = default);
 
-    Task<(string Token, string RefreshToken)> RefreshTokenAsync(
-        string refreshToken,
-        string ipAddress,
+    Task<RefreshTokenResponseDto> RefreshTokenAsync(
+        RefreshTokenDto dto,
         CancellationToken cancellationToken = default);
 
     Task RevokeTokenAsync(
-        string refreshToken,
-        string ipAddress,
+        RevokeTokenDto dto,
         CancellationToken cancellationToken = default);
 
     // User Management

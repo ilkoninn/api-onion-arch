@@ -9,12 +9,39 @@ public sealed class UnitOfWork : IUnitOfWork, IDisposable, IAsyncDisposable
     private IDbContextTransaction? _currentTransaction;
     private bool _disposed;
 
-    public UnitOfWork(AppDbContext context)
+    private readonly Lazy<IUserReadRepository> _userReadRepository;
+    private readonly Lazy<IUserWriteRepository> _userWriteRepository;
+    private readonly Lazy<IRefreshTokenReadRepository> _refreshTokenReadRepository;
+    private readonly Lazy<IRefreshTokenWriteRepository> _refreshTokenWriteRepository;
+    private readonly Lazy<IUserLoginHistoryReadRepository> _userLoginHistoryReadRepository;
+    private readonly Lazy<IUserLoginHistoryWriteRepository> _userLoginHistoryWriteRepository;
+
+    public UnitOfWork(
+        AppDbContext context,
+        Lazy<IUserReadRepository> userReadRepository,
+        Lazy<IUserWriteRepository> userWriteRepository,
+        Lazy<IRefreshTokenReadRepository> refreshTokenReadRepository,
+        Lazy<IRefreshTokenWriteRepository> refreshTokenWriteRepository,
+        Lazy<IUserLoginHistoryReadRepository> userLoginHistoryReadRepository,
+        Lazy<IUserLoginHistoryWriteRepository> userLoginHistoryWriteRepository)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _userReadRepository = userReadRepository ?? throw new ArgumentNullException(nameof(userReadRepository));
+        _userWriteRepository = userWriteRepository ?? throw new ArgumentNullException(nameof(userWriteRepository));
+        _refreshTokenReadRepository = refreshTokenReadRepository ?? throw new ArgumentNullException(nameof(refreshTokenReadRepository));
+        _refreshTokenWriteRepository = refreshTokenWriteRepository ?? throw new ArgumentNullException(nameof(refreshTokenWriteRepository));
+        _userLoginHistoryReadRepository = userLoginHistoryReadRepository ?? throw new ArgumentNullException(nameof(userLoginHistoryReadRepository));
+        _userLoginHistoryWriteRepository = userLoginHistoryWriteRepository ?? throw new ArgumentNullException(nameof(userLoginHistoryWriteRepository));
     }
 
     public bool HasActiveTransaction => _currentTransaction != null;
+
+    public IUserReadRepository UserReadRepository => _userReadRepository.Value;
+    public IUserWriteRepository UserWriteRepository => _userWriteRepository.Value;
+    public IRefreshTokenReadRepository RefreshTokenReadRepository => _refreshTokenReadRepository.Value;
+    public IRefreshTokenWriteRepository RefreshTokenWriteRepository => _refreshTokenWriteRepository.Value;
+    public IUserLoginHistoryReadRepository UserLoginHistoryReadRepository => _userLoginHistoryReadRepository.Value;
+    public IUserLoginHistoryWriteRepository UserLoginHistoryWriteRepository => _userLoginHistoryWriteRepository.Value;
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

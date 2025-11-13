@@ -1,0 +1,10 @@
+﻿global using Project.Application.Extensions;
+global using Project.Persistance.Extensions;
+global using Project.Infrastructure.Extensions;
+global using Project.API.Extensions;
+global using FastEndpoints;
+global using MediatR;
+global using Project.Application.Features.Auth.Commands.Register;
+global using Project.Application.Features.Auth.Commands.RefreshToken;
+global using Project.Application.Features.Auth.Commands.Login;
+global using Project.Application.Features.Auth.Commands.RevokeToken;

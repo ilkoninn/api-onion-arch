@@ -13,6 +13,36 @@ public interface IUnitOfWork
     bool HasActiveTransaction { get; }
 
     /// <summary>
+    /// User read repository
+    /// </summary>
+    IUserReadRepository UserReadRepository { get; }
+
+    /// <summary>
+    /// User write repository
+    /// </summary>
+    IUserWriteRepository UserWriteRepository { get; }
+
+    /// <summary>
+    /// RefreshToken read repository
+    /// </summary>
+    IRefreshTokenReadRepository RefreshTokenReadRepository { get; }
+
+    /// <summary>
+    /// RefreshToken write repository
+    /// </summary>
+    IRefreshTokenWriteRepository RefreshTokenWriteRepository { get; }
+
+    /// <summary>
+    /// UserLoginHistory read repository
+    /// </summary>
+    IUserLoginHistoryReadRepository UserLoginHistoryReadRepository { get; }
+
+    /// <summary>
+    /// UserLoginHistory write repository
+    /// </summary>
+    IUserLoginHistoryWriteRepository UserLoginHistoryWriteRepository { get; }
+
+    /// <summary>
     /// Saves all changes made in this context to the database
     /// </summary>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

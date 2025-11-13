@@ -1,77 +1,79 @@
 namespace Project.Application.Services;
 
 /// <summary>
-/// User service implementation with business logic orchestration
+/// User service implementation with MediatR orchestration
 /// </summary>
 public sealed class UserService(
-          IUserReadRepository userReadRepository,
-          IUserWriteRepository userWriteRepository,
-          ITokenService tokenService,
-          IPasswordHasher passwordHasher) : IUserService
+    IUnitOfWork unitOfWork,
+    ITokenService tokenService,
+    IPasswordService passwordHasher) : IUserService
 {
-
     #region Authentication
 
-    public async Task<(User User, string Token, string RefreshToken)> RegisterAsync(
-        string email,
-        string password,
-        string? firstName,
-        string? lastName,
+    public async Task<RegisterUserResponseDto> RegisterAsync(
+        RegisterUserDto dto,
         CancellationToken cancellationToken = default)
     {
         // Business validation
-        if (await userReadRepository.IsEmailExistsAsync(email, cancellationToken))
+        if (await unitOfWork.UserReadRepository.IsEmailExistsAsync(dto.Email, cancellationToken))
             throw new InvalidOperationException("Email already exists");
 
         // Create user entity
         var user = new User
         {
-            Email = email,
-            NormalizedEmail = email.ToUpperInvariant(),
-            FirstName = firstName,
-            LastName = lastName,
-            PasswordHash = passwordHasher.HashPassword(password),
+            Email = dto.Email,
+            NormalizedEmail = dto.Email.ToUpperInvariant(),
+            FirstName = dto.FirstName,
+            LastName = dto.LastName,
+            PasswordHash = passwordHasher.HashPassword(dto.Password),
             SecurityStamp = Guid.NewGuid().ToString(),
             Status = EUserStatus.Active,
             EmailConfirmed = false
         };
 
-        // Persist
-        await userWriteRepository.AddAsync(user, cancellationToken);
-        await userWriteRepository.SaveChangesAsync(cancellationToken);
+        string token = string.Empty;
+        string refreshToken = string.Empty;
 
-        // Generate tokens
-        var roles = new List<string> { "User" }; // Default role
-        var token = tokenService.GenerateAccessToken(user, roles);
-        var refreshToken = tokenService.GenerateRefreshToken();
-
-        // Store refresh token
-        var refreshTokenEntity = new RefreshToken
+        // Persist within transaction
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            UserId = user.Id,
-            Token = refreshToken,
-            ExpiresAt = DateTime.UtcNow.AddDays(7),
-            CreatedAt = DateTime.UtcNow,
-            CreatedByIp = "0.0.0.0" // TODO: Get from HTTP context
-        };
+            // Add user to database
+            await unitOfWork.UserWriteRepository.AddAsync(user, ct);
+            await unitOfWork.SaveChangesAsync(ct);
 
-        await userWriteRepository.SaveChangesAsync(cancellationToken);
+            // Generate tokens after user is created (to have user.Id)
+            var roles = new List<string> { "User" }; // Default role
+            token = tokenService.GenerateAccessToken(user, roles);
+            refreshToken = tokenService.GenerateRefreshToken();
 
-        return (user, token, refreshToken);
+            // Store refresh token
+            var refreshTokenEntity = new RefreshToken
+            {
+                UserId = user.Id,
+                Token = refreshToken,
+                ExpiresAt = DateTime.UtcNow.AddDays(7),
+                CreatedAt = DateTime.UtcNow,
+                CreatedByIp = "0.0.0.0" // TODO: Get from HTTP context
+            };
+
+            await unitOfWork.RefreshTokenWriteRepository.AddAsync(refreshTokenEntity, ct);
+            await unitOfWork.SaveChangesAsync(ct);
+        }, cancellationToken);
+
+        return new(user, token, refreshToken);
     }
 
-    public async Task<(User User, string Token, string RefreshToken)> LoginAsync(
-        string email,
-        string password,
-        string ipAddress,
+    public async Task<LoginResponseDto> LoginAsync(
+        LoginDto dto,
         CancellationToken cancellationToken = default)
     {
         // Get user with roles
-        var user = await userReadRepository.GetByEmailWithRolesAsync(email, cancellationToken)
+        var user = await unitOfWork.UserReadRepository
+            .GetByEmailWithRolesAsync(dto.Email, cancellationToken)
             ?? throw new UnauthorizedAccessException("Invalid credentials");
 
         // Validate password
-        if (!passwordHasher.VerifyPassword(password, user.PasswordHash))
+        if (!passwordHasher.VerifyPassword(dto.Password, user.PasswordHash))
         {
             // Increment failed attempts
             user.AccessFailedCount++;
@@ -83,8 +85,22 @@ public sealed class UserService(
                 user.LockoutEnd = DateTime.UtcNow.AddMinutes(30);
             }
 
-            userWriteRepository.Update(user);
-            await userWriteRepository.SaveChangesAsync(cancellationToken);
+            unitOfWork.UserWriteRepository.Update(user);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            // Log failed attempt
+            var failedLoginHistory = new UserLoginHistory
+            {
+                UserId = user.Id,
+                AttemptedAt = DateTime.UtcNow,
+                IpAddress = dto.IpAddress ?? "0.0.0.0",
+                UserAgent = "Unknown", // TODO: Get from HTTP context
+                IsSuccessful = false,
+                FailureReason = "Invalid password"
+            };
+
+            await unitOfWork.UserLoginHistoryWriteRepository.AddAsync(failedLoginHistory, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
 
             throw new UnauthorizedAccessException("Invalid credentials");
         }
@@ -93,72 +109,141 @@ public sealed class UserService(
         if (user.IsLocked && user.LockoutEnd > DateTime.UtcNow)
             throw new UnauthorizedAccessException("Account is locked");
 
-        // Reset failed attempts on successful login
-        user.AccessFailedCount = 0;
-        user.LastLoginAt = DateTime.UtcNow;
-        user.LastLoginIp = ipAddress;
+        string token = string.Empty;
+        string refreshToken = string.Empty;
 
-        userWriteRepository.Update(user);
-
-        // Generate tokens
-        var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
-        var token = tokenService.GenerateAccessToken(user, roles);
-        var refreshToken = tokenService.GenerateRefreshToken();
-
-        // Store refresh token
-        var refreshTokenEntity = new RefreshToken
+        // Update user and generate tokens within transaction
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            UserId = user.Id,
-            Token = refreshToken,
-            ExpiresAt = DateTime.UtcNow.AddDays(7),
-            CreatedAt = DateTime.UtcNow,
-            CreatedByIp = ipAddress
-        };
+            // Reset failed attempts on successful login
+            user.AccessFailedCount = 0;
+            user.LastLoginAt = DateTime.UtcNow;
+            user.LastLoginIp = dto.IpAddress ?? "0.0.0.0";
 
-        // Add login history
-        var loginHistory = new UserLoginHistory
-        {
-            UserId = user.Id,
-            AttemptedAt = DateTime.UtcNow,
-            IpAddress = ipAddress,
-            UserAgent = "Unknown" // TODO: Get from HTTP context
-        };
+            unitOfWork.UserWriteRepository.Update(user);
 
-        await userWriteRepository.SaveChangesAsync(cancellationToken);
+            // Generate tokens
+            var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
+            token = tokenService.GenerateAccessToken(user, roles);
+            refreshToken = tokenService.GenerateRefreshToken();
 
-        return (user, token, refreshToken);
+            // Store refresh token
+            var refreshTokenEntity = new RefreshToken
+            {
+                UserId = user.Id,
+                Token = refreshToken,
+                ExpiresAt = DateTime.UtcNow.AddDays(7),
+                CreatedAt = DateTime.UtcNow,
+                CreatedByIp = dto.IpAddress ?? "0.0.0.0"
+            };
+
+            await unitOfWork.RefreshTokenWriteRepository.AddAsync(refreshTokenEntity, ct);
+
+            // Add successful login history
+            var loginHistory = new UserLoginHistory
+            {
+                UserId = user.Id,
+                AttemptedAt = DateTime.UtcNow,
+                IpAddress = dto.IpAddress ?? "0.0.0.0",
+                UserAgent = "Unknown", // TODO: Get from HTTP context
+                IsSuccessful = true
+            };
+
+            await unitOfWork.UserLoginHistoryWriteRepository.AddAsync(loginHistory, ct);
+            await unitOfWork.SaveChangesAsync(ct);
+        }, cancellationToken);
+
+        return new(user, token, refreshToken);
     }
 
-    public async Task<(string Token, string RefreshToken)> RefreshTokenAsync(
-        string refreshToken,
-        string ipAddress,
+    public async Task<RefreshTokenResponseDto> RefreshTokenAsync(
+        RefreshTokenDto dto,
         CancellationToken cancellationToken = default)
     {
-        // Validate and get user from refresh token
-        var userId = await tokenService.ValidateRefreshTokenAsync(refreshToken, cancellationToken)
-       ?? throw new UnauthorizedAccessException("Invalid refresh token");
+        // Get and validate refresh token from database
+        var existingToken = await unitOfWork.RefreshTokenReadRepository
+            .GetByTokenAsync(dto.RefreshToken, cancellationToken)
+            ?? throw new UnauthorizedAccessException("Invalid refresh token");
 
-        var user = await userReadRepository.GetByIdWithRolesAsync(userId, cancellationToken)
+        // Check if token is active
+        if (!existingToken.IsActive)
+        {
+            if (existingToken.IsRevoked)
+                throw new UnauthorizedAccessException("Refresh token has been revoked");
+            
+            if (existingToken.IsExpired)
+                throw new UnauthorizedAccessException("Refresh token has expired");
+        }
+
+        // Get user with roles
+        var user = await unitOfWork.UserReadRepository
+            .GetByIdWithRolesAsync(existingToken.UserId, cancellationToken)
             ?? throw new UnauthorizedAccessException("User not found");
 
-        // Generate new tokens
-        var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
-        var newToken = tokenService.GenerateAccessToken(user, roles);
-        var newRefreshToken = tokenService.GenerateRefreshToken();
+        // Check if user is active
+        if (user.IsLocked)
+            throw new UnauthorizedAccessException("User account is locked");
 
-        // Revoke old token and create new one
-        // TODO: Implement token rotation
+        if (user.Status != EUserStatus.Active)
+            throw new UnauthorizedAccessException("User account is not active");
 
-        return (newToken, newRefreshToken);
+        string newToken = string.Empty;
+        string newRefreshToken = string.Empty;
+
+        // Implement token rotation within transaction
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            // Generate new tokens
+            var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
+            newToken = tokenService.GenerateAccessToken(user, roles);
+            newRefreshToken = tokenService.GenerateRefreshToken();
+
+            // Revoke old refresh token (token rotation for security)
+            existingToken.RevokedAt = DateTime.UtcNow;
+            existingToken.RevokedByIp = dto.IpAddress ?? "0.0.0.0";
+            existingToken.ReplacedByToken = newRefreshToken;
+
+            unitOfWork.RefreshTokenWriteRepository.Update(existingToken);
+
+            // Create new refresh token
+            var newRefreshTokenEntity = new RefreshToken
+            {
+                UserId = user.Id,
+                Token = newRefreshToken,
+                ExpiresAt = DateTime.UtcNow.AddDays(7),
+                CreatedAt = DateTime.UtcNow,
+                CreatedByIp = dto.IpAddress ?? "0.0.0.0"
+            };
+
+            await unitOfWork.RefreshTokenWriteRepository.AddAsync(newRefreshTokenEntity, ct);
+            await unitOfWork.SaveChangesAsync(ct);
+        }, cancellationToken);
+
+        return new(newToken, newRefreshToken);
     }
 
     public async Task RevokeTokenAsync(
-        string refreshToken,
-        string ipAddress,
+        RevokeTokenDto dto,
         CancellationToken cancellationToken = default)
     {
-        // TODO: Mark refresh token as revoked in database
-        await Task.CompletedTask;
+        // Get refresh token from database
+        var existingToken = await unitOfWork.RefreshTokenReadRepository
+            .GetByTokenAsync(dto.RefreshToken, cancellationToken)
+            ?? throw new UnauthorizedAccessException("Invalid refresh token");
+
+        // Check if token is already revoked
+        if (existingToken.IsRevoked)
+            throw new InvalidOperationException("Token is already revoked");
+
+        // Revoke token within transaction
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            existingToken.RevokedAt = DateTime.UtcNow;
+            existingToken.RevokedByIp = dto.IpAddress ?? "0.0.0.0";
+
+            unitOfWork.RefreshTokenWriteRepository.Update(existingToken);
+            await unitOfWork.SaveChangesAsync(ct);
+        }, cancellationToken);
     }
 
     #endregion
@@ -167,30 +252,30 @@ public sealed class UserService(
 
     public async Task<User> GetUserByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await userReadRepository.GetByIdAsync(id, asNoTracking: true, cancellationToken)
-        ?? throw new KeyNotFoundException($"User with ID {id} not found");
+        return await unitOfWork.UserReadRepository.GetByIdAsync(id, asNoTracking: true, cancellationToken)
+            ?? throw new KeyNotFoundException($"User with ID {id} not found");
     }
 
     public async Task<User> GetUserByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        return await userReadRepository.GetByEmailAsync(email, cancellationToken)
+        return await unitOfWork.UserReadRepository.GetByEmailAsync(email, cancellationToken)
             ?? throw new KeyNotFoundException($"User with email {email} not found");
     }
 
     public async Task<User> UpdateUserAsync(User user, CancellationToken cancellationToken = default)
     {
-        userWriteRepository.Update(user);
-        await userWriteRepository.SaveChangesAsync(cancellationToken);
+        unitOfWork.UserWriteRepository.Update(user);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
         return user;
     }
 
     public async Task DeleteUserAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var user = await userReadRepository.GetByIdAsync(id, cancellationToken)
-         ?? throw new KeyNotFoundException($"User with ID {id} not found");
+        var user = await unitOfWork.UserReadRepository.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException($"User with ID {id} not found");
 
-        userWriteRepository.SoftDelete(user);
-        await userWriteRepository.SaveChangesAsync(cancellationToken);
+        unitOfWork.UserWriteRepository.SoftDelete(user);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     #endregion
@@ -203,20 +288,36 @@ public sealed class UserService(
         string newPassword,
         CancellationToken cancellationToken = default)
     {
-        var user = await userReadRepository.GetByIdAsync(userId, cancellationToken)
+        var user = await unitOfWork.UserReadRepository.GetByIdAsync(userId, cancellationToken)
             ?? throw new KeyNotFoundException("User not found");
 
         // Verify current password
         if (!passwordHasher.VerifyPassword(currentPassword, user.PasswordHash))
             return false;
 
-        // Update password
-        user.PasswordHash = passwordHasher.HashPassword(newPassword);
-        user.LastPasswordChangedAt = DateTime.UtcNow;
-        user.SecurityStamp = Guid.NewGuid().ToString();
+        // Update password within transaction
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            user.PasswordHash = passwordHasher.HashPassword(newPassword);
+            user.LastPasswordChangedAt = DateTime.UtcNow;
+            user.SecurityStamp = Guid.NewGuid().ToString(); // Invalidate existing tokens
 
-        userWriteRepository.Update(user);
-        await userWriteRepository.SaveChangesAsync(cancellationToken);
+            unitOfWork.UserWriteRepository.Update(user);
+            await unitOfWork.SaveChangesAsync(ct);
+
+            // Revoke all existing refresh tokens for security
+            var userTokens = await unitOfWork.RefreshTokenReadRepository
+                .GetActiveTokensByUserIdAsync(userId, ct);
+
+            foreach (var token in userTokens)
+            {
+                token.RevokedAt = DateTime.UtcNow;
+                token.RevokedByIp = "System - Password Change";
+                unitOfWork.RefreshTokenWriteRepository.Update(token);
+            }
+
+            await unitOfWork.SaveChangesAsync(ct);
+        }, cancellationToken);
 
         return true;
     }
@@ -228,15 +329,31 @@ public sealed class UserService(
         CancellationToken cancellationToken = default)
     {
         // TODO: Validate reset token
-        var user = await userReadRepository.GetByEmailAsync(email, cancellationToken)
-                 ?? throw new KeyNotFoundException("User not found");
+        var user = await unitOfWork.UserReadRepository.GetByEmailAsync(email, cancellationToken)
+            ?? throw new KeyNotFoundException("User not found");
 
-        user.PasswordHash = passwordHasher.HashPassword(newPassword);
-        user.LastPasswordChangedAt = DateTime.UtcNow;
-        user.SecurityStamp = Guid.NewGuid().ToString();
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            user.PasswordHash = passwordHasher.HashPassword(newPassword);
+            user.LastPasswordChangedAt = DateTime.UtcNow;
+            user.SecurityStamp = Guid.NewGuid().ToString(); // Invalidate existing tokens
 
-        userWriteRepository.Update(user);
-        await userWriteRepository.SaveChangesAsync(cancellationToken);
+            unitOfWork.UserWriteRepository.Update(user);
+            await unitOfWork.SaveChangesAsync(ct);
+
+            // Revoke all existing refresh tokens for security
+            var userTokens = await unitOfWork.RefreshTokenReadRepository
+                .GetActiveTokensByUserIdAsync(user.Id, ct);
+
+            foreach (var token in userTokens)
+            {
+                token.RevokedAt = DateTime.UtcNow;
+                token.RevokedByIp = "System - Password Reset";
+                unitOfWork.RefreshTokenWriteRepository.Update(token);
+            }
+
+            await unitOfWork.SaveChangesAsync(ct);
+        }, cancellationToken);
     }
 
     #endregion
@@ -245,19 +362,32 @@ public sealed class UserService(
 
     public async Task AssignRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement role assignment
+        // Get user
+        var user = await unitOfWork.UserReadRepository.GetByIdAsync(userId, cancellationToken)
+            ?? throw new KeyNotFoundException("User not found");
+
+        // TODO: Check if role exists
+        // TODO: Check if user already has this role
+        // TODO: Add UserRole entity and save
+
         await Task.CompletedTask;
     }
 
     public async Task RemoveRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement role removal
+        // Get user
+        var user = await unitOfWork.UserReadRepository.GetByIdAsync(userId, cancellationToken)
+            ?? throw new KeyNotFoundException("User not found");
+
+        // TODO: Check if user has this role
+        // TODO: Remove UserRole entity and save
+
         await Task.CompletedTask;
     }
 
     public async Task<IReadOnlyList<Role>> GetUserRolesAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var user = await userReadRepository.GetByIdWithRolesAsync(userId, cancellationToken)
+        var user = await unitOfWork.UserReadRepository.GetByIdWithRolesAsync(userId, cancellationToken)
             ?? throw new KeyNotFoundException("User not found");
 
         return user.UserRoles.Select(ur => ur.Role).ToList();
@@ -269,39 +399,48 @@ public sealed class UserService(
 
     public async Task LockUserAsync(Guid userId, DateTime? lockoutEnd, CancellationToken cancellationToken = default)
     {
-        var user = await userReadRepository.GetByIdAsync(userId, cancellationToken)
+        var user = await unitOfWork.UserReadRepository.GetByIdAsync(userId, cancellationToken)
             ?? throw new KeyNotFoundException("User not found");
 
-        user.IsLocked = true;
-        user.LockoutEnd = lockoutEnd;
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            user.IsLocked = true;
+            user.LockoutEnd = lockoutEnd;
 
-        userWriteRepository.Update(user);
-        await userWriteRepository.SaveChangesAsync(cancellationToken);
+            unitOfWork.UserWriteRepository.Update(user);
+            await unitOfWork.SaveChangesAsync(ct);
+        }, cancellationToken);
     }
 
     public async Task UnlockUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var user = await userReadRepository.GetByIdAsync(userId, cancellationToken)
-               ?? throw new KeyNotFoundException("User not found");
+        var user = await unitOfWork.UserReadRepository.GetByIdAsync(userId, cancellationToken)
+            ?? throw new KeyNotFoundException("User not found");
 
-        user.IsLocked = false;
-        user.LockoutEnd = null;
-        user.AccessFailedCount = 0;
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            user.IsLocked = false;
+            user.LockoutEnd = null;
+            user.AccessFailedCount = 0;
 
-        userWriteRepository.Update(user);
-        await userWriteRepository.SaveChangesAsync(cancellationToken);
+            unitOfWork.UserWriteRepository.Update(user);
+            await unitOfWork.SaveChangesAsync(ct);
+        }, cancellationToken);
     }
 
     public async Task ConfirmEmailAsync(Guid userId, string token, CancellationToken cancellationToken = default)
     {
         // TODO: Validate confirmation token
-        var user = await userReadRepository.GetByIdAsync(userId, cancellationToken)
-        ?? throw new KeyNotFoundException("User not found");
+        var user = await unitOfWork.UserReadRepository.GetByIdAsync(userId, cancellationToken)
+            ?? throw new KeyNotFoundException("User not found");
 
-        user.EmailConfirmed = true;
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            user.EmailConfirmed = true;
 
-        userWriteRepository.Update(user);
-        await userWriteRepository.SaveChangesAsync(cancellationToken);
+            unitOfWork.UserWriteRepository.Update(user);
+            await unitOfWork.SaveChangesAsync(ct);
+        }, cancellationToken);
     }
 
     #endregion
