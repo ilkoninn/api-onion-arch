@@ -1,11 +1,11 @@
 namespace Project.Application.Features.Auth.Commands.RefreshToken;
 
-public sealed record RefreshTokenCommand(
+public sealed record RefreshTokenCommandRequest(
     string RefreshToken,
     string IpAddress
 ) : IRequest<RefreshTokenCommandResponse>;
 
 public sealed record RefreshTokenCommandResponse(
-    string Token,
+    string AccessToken,
     string RefreshToken
 );

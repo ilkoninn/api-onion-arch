@@ -6,18 +6,36 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // Authentication
-        services.AddAuthentication()
-            .AddBearerToken();
-
-        // Authorization
-        services.AddAuthorization();
-
-        // Global Exception Middleware
-        services.AddTransient<GlobalExceptionMiddleware>();
-
-        // FastEndpoints
+        // Add FastEndpoints
         services.AddFastEndpoints();
+
+        // Add JWT Authentication
+        var jwtSecret = configuration["Jwt:Secret"]!;
+        var jwtIssuer = configuration["Jwt:Issuer"]!;
+        var jwtAudience = configuration["Jwt:Audience"]!;
+
+        services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+                ValidateIssuer = true,
+                ValidIssuer = jwtIssuer,
+                ValidateAudience = true,
+                ValidAudience = jwtAudience,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
+            };
+        });
+        
+        // Add Authorization
+        services.AddAuthorization();
 
         return services;
     }
@@ -25,24 +43,17 @@ public static class DependencyInjection
     public static WebApplication UseAPIMiddlewares(
         this WebApplication app)
     {
-        // Development-only Swagger/OpenAPI
+        // Configure the HTTP request pipeline
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
         }
 
-        // Global built-in exception routing
-        app.UseExceptionHandler(_ => { });
-
-        // Our custom global exception handling logic
-        app.UseMiddleware<GlobalExceptionMiddleware>();
-
         app.UseHttpsRedirection();
-
         app.UseAuthentication();
         app.UseAuthorization();
 
-        // FastEndpoints routing
+        // Map FastEndpoints
         app.UseFastEndpoints();
 
         return app;

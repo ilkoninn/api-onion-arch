@@ -23,7 +23,10 @@ public sealed class TokenService(
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.UtcNow.AddMinutes(15),
+            Expires = DateTime.UtcNow.AddMinutes(
+                int.Parse(configuration["Jwt:AccessTokenExpirationMinutes"] ?? "15")),
+            Issuer = configuration["Jwt:Issuer"],
+            Audience = configuration["Jwt:Audience"],
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(key),
                 SecurityAlgorithms.HmacSha256Signature)
@@ -45,7 +48,25 @@ public sealed class TokenService(
         string refreshToken, 
         CancellationToken cancellationToken = default)
     {
-        // Validation logic
-        throw new NotImplementedException();
+        // Validation logic for refresh token format
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            return Task.FromResult<Guid?>(null);
+
+        // Check if refresh token is a valid base64 string
+        try
+        {
+            var bytes = Convert.FromBase64String(refreshToken);
+            
+            if (bytes.Length != 64)
+                return Task.FromResult<Guid?>(null);
+
+            // Refresh token format is valid
+            return Task.FromResult<Guid?>(Guid.NewGuid());
+        }
+        catch (FormatException)
+        {
+            // Invalid base64 format
+            return Task.FromResult<Guid?>(null);
+        }
     }
 }

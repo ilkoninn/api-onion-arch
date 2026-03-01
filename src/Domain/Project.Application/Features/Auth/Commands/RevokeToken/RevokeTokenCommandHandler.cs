@@ -3,10 +3,10 @@ namespace Project.Application.Features.Auth.Commands.RevokeToken;
 public sealed class RevokeTokenCommandHandler(
     IMapper mapper,
     IUserService service)
-    : IRequestHandler<RevokeTokenCommand, RevokeTokenCommandResponse>
+    : IRequestHandler<RevokeTokenCommandRequest, RevokeTokenCommandResponse>
 {
     public async Task<RevokeTokenCommandResponse> Handle(
-        RevokeTokenCommand request,
+        RevokeTokenCommandRequest request,
         CancellationToken cancellationToken)
     {
         var dto = mapper.Map<RevokeTokenDto>(request);

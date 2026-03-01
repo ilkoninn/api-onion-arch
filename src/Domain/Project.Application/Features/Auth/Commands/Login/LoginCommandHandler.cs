@@ -3,10 +3,10 @@ namespace Project.Application.Features.Auth.Commands.Login;
 public sealed class LoginCommandHandler(
     IMapper mapper,
     IUserService service)
-    : IRequestHandler<LoginCommand, LoginCommandResponse>
+    : IRequestHandler<LoginCommandRequest, LoginCommandResponse>
 {
     public async Task<LoginCommandResponse> Handle(
-        LoginCommand request,
+        LoginCommandRequest request,
         CancellationToken cancellationToken)
     {
         var dto = mapper.Map<LoginDto>(request);

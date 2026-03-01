@@ -1,14 +1,7 @@
 namespace Project.API.Endpoints.Auth;
 
-public sealed class RegisterEndpoint : Endpoint<RegisterCommand, RegisterCommandResponse>
+public sealed class RegisterEndpoint(IMediator mediator) : Endpoint<RegisterCommandRequest, RegisterCommandResponse>
 {
-    private readonly IMediator _mediator;
-
-    public RegisterEndpoint(IMediator mediator)
-    {
-        _mediator = mediator;
-    }
-
     public override void Configure()
     {
         Post("/api/auth/register");
@@ -21,9 +14,9 @@ public sealed class RegisterEndpoint : Endpoint<RegisterCommand, RegisterCommand
             
     }
 
-    public override async Task HandleAsync(RegisterCommand req, CancellationToken ct)
+    public override async Task HandleAsync(RegisterCommandRequest req, CancellationToken ct)
     {
-        var result = await _mediator.Send(req, ct);
+        var result = await mediator.Send(req, ct);
         await Send.OkAsync(result, ct);
     }
 }

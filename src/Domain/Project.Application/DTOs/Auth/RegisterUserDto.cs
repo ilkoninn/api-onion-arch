@@ -7,8 +7,12 @@ public sealed record RegisterUserDto(
     string? LastName
 );
 
-public sealed record RegisterUserResponseDto(
-    User User,
-    string Token,
-    string RefreshToken
-);
+public sealed record RegisterUserResponseDto
+{
+    public Guid UserId { get; init; }
+    public string Email { get; init; } = string.Empty;
+    public string? FirstName { get; init; }
+    public string? LastName { get; init; }
+    public string Token { get; init; } = string.Empty;
+    public string RefreshToken { get; init; } = string.Empty;
+}

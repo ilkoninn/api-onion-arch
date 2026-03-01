@@ -23,7 +23,6 @@ public static class DependencyInjection
             options.UseSqlServer(connectionString, sqlOptions =>
             {
                 sqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
-                sqlOptions.EnableRetryOnFailure(maxRetryCount: 3);
             });
 
             // Add interceptors

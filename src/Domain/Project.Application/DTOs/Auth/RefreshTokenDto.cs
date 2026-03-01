@@ -6,6 +6,6 @@ public sealed record RefreshTokenDto(
 );
 
 public sealed record RefreshTokenResponseDto(
-    string Token,
+    string AccessToken,
     string RefreshToken
 );

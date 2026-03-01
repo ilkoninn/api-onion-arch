@@ -5,10 +5,10 @@ namespace Project.Application.Features.Auth.Commands.Register;
 public sealed class RegisterCommandHandler(
     IMapper mapper,
     IUserService service)
-    : IRequestHandler<RegisterCommand, RegisterCommandResponse>
+    : IRequestHandler<RegisterCommandRequest, RegisterCommandResponse>
 {
     public async Task<RegisterCommandResponse> Handle(
-        RegisterCommand request,
+        RegisterCommandRequest request,
         CancellationToken cancellationToken)
     {
         var dto = mapper.Map<RegisterUserDto>(request);

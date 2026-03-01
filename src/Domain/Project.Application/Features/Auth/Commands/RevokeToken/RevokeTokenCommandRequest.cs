@@ -1,6 +1,6 @@
 namespace Project.Application.Features.Auth.Commands.RevokeToken;
 
-public sealed record RevokeTokenCommand(
+public sealed record RevokeTokenCommandRequest(
     string RefreshToken,
     string IpAddress
 ) : IRequest<RevokeTokenCommandResponse>;

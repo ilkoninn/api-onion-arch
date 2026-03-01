@@ -1,17 +1,7 @@
-
 namespace Project.API.Endpoints.Auth;
 
-public sealed class RefreshTokenEndpoint : Endpoint<RefreshTokenCommand, RefreshTokenCommandResponse>
+public sealed class RefreshTokenEndpoint(IMediator mediator) : Endpoint<RefreshTokenCommandRequest, RefreshTokenCommandResponse>
 {
-    private readonly IMediator _mediator;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-
-    public RefreshTokenEndpoint(IMediator mediator, IHttpContextAccessor httpContextAccessor)
-    {
-        _mediator = mediator;
-        _httpContextAccessor = httpContextAccessor;
-    }
-
     public override void Configure()
     {
         Post("/api/auth/refresh-token");
@@ -23,9 +13,9 @@ public sealed class RefreshTokenEndpoint : Endpoint<RefreshTokenCommand, Refresh
             .WithDescription("Get a new access token using refresh token"));
     }
 
-    public override async Task HandleAsync(RefreshTokenCommand req, CancellationToken ct)
+    public override async Task HandleAsync(RefreshTokenCommandRequest req, CancellationToken ct)
     {
-        var result = await _mediator.Send(req, ct);
+        var result = await mediator.Send(req, ct);
         await Send.OkAsync(result, ct);
     }
 }

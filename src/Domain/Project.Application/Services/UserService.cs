@@ -60,7 +60,16 @@ public sealed class UserService(
             await unitOfWork.SaveChangesAsync(ct);
         }, cancellationToken);
 
-        return new(user, token, refreshToken);
+        // Return DTO with proper structure
+        return new RegisterUserResponseDto
+        {
+            UserId = user.Id,
+            Email = user.Email,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Token = token,
+            RefreshToken = refreshToken
+        };
     }
 
     public async Task<LoginResponseDto> LoginAsync(
@@ -153,7 +162,16 @@ public sealed class UserService(
             await unitOfWork.SaveChangesAsync(ct);
         }, cancellationToken);
 
-        return new(user, token, refreshToken);
+        // Return DTO with proper structure
+        return new LoginResponseDto
+        {
+            UserId = user.Id,
+            Email = user.Email,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Token = token,
+            RefreshToken = refreshToken
+        };
     }
 
     public async Task<RefreshTokenResponseDto> RefreshTokenAsync(
@@ -219,7 +237,8 @@ public sealed class UserService(
             await unitOfWork.SaveChangesAsync(ct);
         }, cancellationToken);
 
-        return new(newToken, newRefreshToken);
+        // Return DTO with proper structure
+        return new RefreshTokenResponseDto(newToken, newRefreshToken);
     }
 
     public async Task RevokeTokenAsync(

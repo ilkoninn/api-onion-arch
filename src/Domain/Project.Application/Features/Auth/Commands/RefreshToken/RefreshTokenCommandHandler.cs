@@ -3,10 +3,10 @@ namespace Project.Application.Features.Auth.Commands.RefreshToken;
 public sealed class RefreshTokenCommandHandler(
     IMapper mapper,
     IUserService service)
-    : IRequestHandler<RefreshTokenCommand, RefreshTokenCommandResponse>
+    : IRequestHandler<RefreshTokenCommandRequest, RefreshTokenCommandResponse>
 {
     public async Task<RefreshTokenCommandResponse> Handle(
-        RefreshTokenCommand request,
+        RefreshTokenCommandRequest request,
         CancellationToken cancellationToken)
     {
         var dto = mapper.Map<RefreshTokenDto>(request);

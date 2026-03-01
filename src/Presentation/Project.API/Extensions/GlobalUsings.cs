@@ -8,3 +8,6 @@ global using Project.Application.Features.Auth.Commands.Register;
 global using Project.Application.Features.Auth.Commands.RefreshToken;
 global using Project.Application.Features.Auth.Commands.Login;
 global using Project.Application.Features.Auth.Commands.RevokeToken;
+global using Microsoft.AspNetCore.Authentication.JwtBearer;
+global using Microsoft.IdentityModel.Tokens;
+global using System.Text;
